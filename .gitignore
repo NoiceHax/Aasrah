@@ -1,0 +1,49 @@
+# --- Secrets & keys ---
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editors & tooling ---
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+
+# --- Root-level build artefacts ---
+/logo.png
+!frontend/public/logo.png
+
+# --- Python (backend) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+uploads/
+*.log
+
+# --- Node / Next.js (frontend) ---
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

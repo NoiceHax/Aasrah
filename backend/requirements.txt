@@ -1,0 +1,43 @@
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- Settings & validation ---
+pydantic==2.10.5
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# --- Database / ORM ---
+sqlalchemy==2.0.37
+alembic==1.14.1
+psycopg[binary]==3.2.4
+
+# --- Auth & security ---
+passlib[bcrypt]==1.7.4
+# Pinned to 4.0.1: passlib 1.7.4 can't read the __about__.__version__ removed
+# in bcrypt 4.1+, which logs a noisy (harmless) warning on every hash.
+bcrypt==4.0.1
+pyjwt==2.10.1
+
+# --- Images ---
+pillow==11.1.0
+
+# --- Rate limiting ---
+slowapi==0.1.9
+
+# --- HTTP client (reverse geocoding proxy) ---
+httpx==0.28.1
+
+# --- AI (NVIDIA NIM, OpenAI-compatible) ---
+openai==1.109.1
+
+# --- Web Push (VAPID) ---
+pywebpush==2.0.3
+
+# --- Error tracking (optional; activates only when SENTRY_DSN is set) ---
+sentry-sdk[fastapi]==2.20.0
+
+# --- Tests ---
+pytest==8.3.4
+pytest-asyncio==0.25.2
