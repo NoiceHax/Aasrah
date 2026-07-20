@@ -66,7 +66,9 @@ def discover_nearby(
     search: str | None = Query(default=None, max_length=200),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    ngo: NGO = Depends(get_current_ngo),
+    # Verified-only, to match the case-detail view: an unverified NGO must not
+    # be able to enumerate nearby reports via the list when it cannot open them.
+    ngo: NGO = Depends(get_verified_ngo),
     db: Session = Depends(get_db),
 ) -> PaginatedReports:
     service = NgoReportService(db)

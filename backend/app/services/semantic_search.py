@@ -21,18 +21,37 @@ from app.services.geo_utils import bounding_box, haversine_km
 
 def search(db: Session, ngo: NGO, query: str, *, limit: int = 30) -> dict:
     filters = provider.parse_search_query(query)
+
+    # Fail CLOSED: no service area means no scope, so no results (rather than
+    # every report on the platform).
+    if ngo.service_latitude is None or ngo.service_longitude is None:
+        return {
+            "query": query,
+            "parsed": filters.model_dump(),
+            "count": 0,
+            "results": [],
+        }
+
     stmt = select(Report).options(selectinload(Report.images))
 
-    # Restrict to the NGO's service area when it has one.
-    has_area = ngo.service_latitude is not None and ngo.service_longitude is not None
-    if has_area:
-        min_lat, max_lat, min_lon, max_lon = bounding_box(
-            ngo.service_latitude, ngo.service_longitude, ngo.service_radius_km
+    # Restrict to the NGO's service area (bounding box; exact radius applied below).
+    min_lat, max_lat, min_lon, max_lon = bounding_box(
+        ngo.service_latitude, ngo.service_longitude, ngo.service_radius_km
+    )
+    stmt = stmt.where(
+        Report.latitude.is_not(None),
+        Report.longitude.is_not(None),
+        Report.latitude.between(min_lat, max_lat),
+        Report.longitude.between(min_lon, max_lon),
+    )
+
+    # Never surface another organization's claimed cases.
+    stmt = stmt.where(
+        or_(
+            Report.claimed_by_ngo_id.is_(None),
+            Report.claimed_by_ngo_id == ngo.id,
         )
-        stmt = stmt.where(
-            Report.latitude.between(min_lat, max_lat),
-            Report.longitude.between(min_lon, max_lon),
-        )
+    )
 
     if filters.children_only:
         stmt = stmt.where(Report.children_present.is_(True))
@@ -57,6 +76,17 @@ def search(db: Session, ngo: NGO, query: str, *, limit: int = 30) -> dict:
         ))
 
     reports = list(db.scalars(stmt.order_by(Report.created_at.desc())).all())
+
+    # Exact-radius post-filter: the bounding box is a superset of the circle,
+    # so without this an NGO in an overlapping metro sees cases (including
+    # ai_summary free text) outside its actual service area.
+    reports = [
+        r for r in reports
+        if r.latitude is not None
+        and r.longitude is not None
+        and haversine_km(ngo.service_latitude, ngo.service_longitude, r.latitude, r.longitude)
+        <= ngo.service_radius_km
+    ]
 
     # Post-filters that can't be expressed cleanly in SQL.
     now = datetime.now(timezone.utc)

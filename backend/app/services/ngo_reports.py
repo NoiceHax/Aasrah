@@ -54,6 +54,45 @@ _STATUS_LABELS: dict[ReportStatus, str] = {
 }
 
 
+def is_legal_transition(current: ReportStatus, new_status: ReportStatus) -> bool:
+    """True if `current -> new_status` is permitted by the rescue state machine."""
+    return new_status in _TRANSITIONS.get(current, set())
+
+
+def apply_status_transition(
+    report: Report, new_status: ReportStatus, *, allow_noop: bool = False
+) -> ReportStatus:
+    """Single guarded entry point for every write to `Report.status`.
+
+    Consults `_TRANSITIONS` and raises `ValidationError` on an illegal edge, so
+    no caller (NGO API, volunteer workflow, automation rules, retention purge)
+    can skip ahead, resurrect a terminal case, or close a dispatched one.
+
+    Returns the previous status. `closed_at` is stamped exactly once — a second
+    transition into CLOSED never overwrites the canonical completion time.
+    """
+    previous = report.status
+    if new_status == previous:
+        if allow_noop:
+            return previous
+        raise ValidationError(
+            f"Case is already '{previous.value}'", code="invalid_transition"
+        )
+    if not is_legal_transition(previous, new_status):
+        raise ValidationError(
+            f"Cannot move a case from '{previous.value}' to '{new_status.value}'",
+            code="invalid_transition",
+        )
+    report.status = new_status
+    if new_status == ReportStatus.CLOSED and report.closed_at is None:
+        report.closed_at = datetime.now(timezone.utc)
+    return previous
+
+
+def status_label(status: ReportStatus) -> str:
+    return _STATUS_LABELS.get(status, status.value.replace("_", " ").title())
+
+
 @dataclass
 class DiscoveryFilters:
     status: ReportStatus | None = None
@@ -74,21 +113,34 @@ class NgoReportService:
 
     def discover(self, ngo: NGO, filters: DiscoveryFilters) -> tuple[list[tuple[Report, float | None]], int]:
         """Return (report, distance_km) tuples within the NGO service area, plus total count."""
+        # Fail CLOSED: without a configured service area there is no scope to
+        # restrict discovery to, so the NGO sees nothing rather than every
+        # report on the platform. (An NGO can null its own coordinates via
+        # PATCH /ngo/profile, so this must not be treated as "no filter".)
+        if ngo.service_latitude is None or ngo.service_longitude is None:
+            return [], 0
+
         stmt = select(Report).options(selectinload(Report.images))
 
-        # Geographic pre-filter via bounding box when the NGO has a service area.
-        has_area = ngo.service_latitude is not None and ngo.service_longitude is not None
+        # Geographic pre-filter via bounding box.
         radius = filters.max_distance_km or ngo.service_radius_km
-        if has_area:
-            min_lat, max_lat, min_lon, max_lon = bounding_box(
-                ngo.service_latitude, ngo.service_longitude, radius
+        min_lat, max_lat, min_lon, max_lon = bounding_box(
+            ngo.service_latitude, ngo.service_longitude, radius
+        )
+        stmt = stmt.where(
+            Report.latitude.is_not(None),
+            Report.longitude.is_not(None),
+            Report.latitude.between(min_lat, max_lat),
+            Report.longitude.between(min_lon, max_lon),
+        )
+
+        # Never surface another organization's claimed cases.
+        stmt = stmt.where(
+            or_(
+                Report.claimed_by_ngo_id.is_(None),
+                Report.claimed_by_ngo_id == ngo.id,
             )
-            stmt = stmt.where(
-                Report.latitude.is_not(None),
-                Report.longitude.is_not(None),
-                Report.latitude.between(min_lat, max_lat),
-                Report.longitude.between(min_lon, max_lon),
-            )
+        )
 
         if filters.status:
             stmt = stmt.where(Report.status == filters.status)
@@ -108,7 +160,8 @@ class NgoReportService:
                     Report.tracking_id.ilike(term),
                     Report.description.ilike(term),
                     Report.address.ilike(term),
-                    Report.reporter_name.ilike(term),
+                    # reporter_name is deliberately NOT searchable: it let one
+                    # NGO probe for another organization's reporters by name.
                 )
             )
 
@@ -118,7 +171,7 @@ class NgoReportService:
         annotated: list[tuple[Report, float | None]] = []
         for r in reports:
             dist = None
-            if has_area and r.latitude is not None and r.longitude is not None:
+            if r.latitude is not None and r.longitude is not None:
                 dist = haversine_km(
                     ngo.service_latitude, ngo.service_longitude, r.latitude, r.longitude
                 )
@@ -210,8 +263,7 @@ class NgoReportService:
         if report.claimed_by_ngo_id != ngo.id:
             raise ForbiddenError("This case is not assigned to your organization", code="not_your_case")
 
-        allowed = _TRANSITIONS.get(report.status, set())
-        if new_status not in allowed:
+        if not is_legal_transition(report.status, new_status):
             raise ValidationError(
                 f"Cannot move a case from '{report.status.value}' to '{new_status.value}'",
                 code="invalid_transition",
@@ -225,11 +277,9 @@ class NgoReportService:
                   "claimed_by_ngo_id": str(report.claimed_by_ngo_id) if report.claimed_by_ngo_id else None},
         )
 
-        report.status = new_status
-        if new_status == ReportStatus.CLOSED:
-            report.closed_at = datetime.now(timezone.utc)
+        apply_status_transition(report, new_status)
 
-        label = _STATUS_LABELS.get(new_status, new_status.value.replace("_", " ").title())
+        label = status_label(new_status)
         add_timeline_event(
             self.db,
             report_id=report.id,

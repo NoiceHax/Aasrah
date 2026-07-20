@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -61,7 +61,10 @@ class AutomationRuleIn(BaseModel):
     name: str
     trigger: AutomationTrigger
     enabled: bool = True
-    threshold_minutes: int = 30
+    # Bounded: 0 would match every active case on the first tick (and the
+    # per-rule interval guard `elapsed < threshold_minutes` would never skip),
+    # mass-mutating the entire live caseload. Ceiling is one week.
+    threshold_minutes: int = Field(30, ge=5, le=10080)
     config: dict | None = None
 
 

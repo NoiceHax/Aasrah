@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, get_current_user
 from app.api.ngo_deps import get_current_ngo
-from app.core.exceptions import NotFoundError, ValidationError
+from app.api.v1.ngo.case_extras import _require_owned_case
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.db.session import get_db
 from app.models.ngo import NGO
 from app.models.report import Report
@@ -37,9 +38,9 @@ def report_duplicates(
     db: Session = Depends(get_db),
 ) -> dict:
     """Suggested duplicate reports describing the same person/situation."""
-    report = db.get(Report, report_id)
-    if not report:
-        raise NotFoundError("Report not found")
+    # Only the owning NGO may inspect a case's duplicate candidates: the
+    # response contains other reports' summaries.
+    report = _require_owned_case(db, ngo, report_id)
     return {"duplicates": dedup.find_duplicates(db, report)}
 
 
@@ -57,10 +58,19 @@ def merge_duplicate(
     db: Session = Depends(get_db),
 ) -> MessageResponse:
     """Mark `duplicate_id` as a duplicate of `report_id` (non-destructive)."""
-    primary = db.get(Report, report_id)
+    # The primary must be a case this organization owns. Without this, any NGO
+    # could mark any report on the platform as a duplicate of any other and
+    # bury a live rescue case.
+    primary = _require_owned_case(db, ngo, report_id)
     duplicate = db.get(Report, body.duplicate_id)
-    if not primary or not duplicate:
+    if not duplicate:
         raise NotFoundError("Report not found")
+    # The report being buried must be unclaimed or already ours; we may not
+    # touch another organization's case.
+    if duplicate.claimed_by_ngo_id is not None and duplicate.claimed_by_ngo_id != ngo.id:
+        raise ForbiddenError(
+            "This case is not assigned to your organization", code="not_your_case"
+        )
     if primary.id == duplicate.id:
         raise ValidationError("A report cannot be a duplicate of itself", code="self_merge")
     dedup.merge_reports(db, primary, duplicate)

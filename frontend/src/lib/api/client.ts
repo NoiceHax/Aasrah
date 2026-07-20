@@ -5,11 +5,11 @@ import axios, {
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from "axios";
+import { API_BASE_URL } from "./config";
 import { tokenStore } from "./token-store";
 import type { ApiError, TokenPair } from "./types";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+const BASE_URL = API_BASE_URL;
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,

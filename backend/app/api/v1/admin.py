@@ -42,6 +42,7 @@ from app.schemas.auth import MessageResponse
 from app.services.audit import notify, record_audit
 from app.services.email import templates as email_templates
 from app.services.email.sender import queue_email
+from app.services.ngo_reports import apply_status_transition
 from app.services.realtime import bus
 
 
@@ -344,10 +345,14 @@ def force_close(
     report = db.get(Report, report_id)
     if not report:
         raise NotFoundError("Report not found")
-    report.status = ReportStatus.CLOSED
-    report.closed_at = datetime.now(timezone.utc)
+    # Force-close is an admin override, but it still goes through the state
+    # machine so `closed_at` is stamped once and an illegal edge is refused
+    # rather than silently written. This is the last code path that wrote
+    # report.status directly.
+    previous = apply_status_transition(report, ReportStatus.CLOSED)
     record_audit(
         db, action="report.force_close", actor_id=admin.id,
+        meta={"previous_status": previous.value},
         entity_type="report", entity_id=str(report.id), ip_address=client_ip(request),
     )
     db.commit()
@@ -375,8 +380,18 @@ def create_announcement(
     db.add(ann)
     db.commit()
     db.refresh(ann)
-    # Broadcast to connected clients in real time.
-    bus.broadcast("announcement", {"title": ann.title, "body": ann.body, "audience": ann.audience.value})
+    # Push to connected clients in real time, honouring the chosen audience.
+    # Sending an NGO-only announcement to every socket and letting the client
+    # filter would leak its contents to volunteers.
+    payload = {"title": ann.title, "body": ann.body, "audience": ann.audience.value}
+    if ann.audience is AnnouncementAudience.EVERYONE:
+        bus.broadcast("announcement", payload)
+    elif ann.audience is AnnouncementAudience.NGO:
+        bus.publish_to_roles((UserRole.NGO.value, UserRole.ADMIN.value), "announcement", payload)
+    else:
+        bus.publish_to_roles(
+            (UserRole.VOLUNTEER.value, UserRole.ADMIN.value), "announcement", payload
+        )
     return AnnouncementOut.model_validate(ann)
 
 
