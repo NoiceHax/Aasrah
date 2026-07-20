@@ -23,7 +23,9 @@ set -euo pipefail
 
 REPO=/home/ec2-user/aasrah
 cd "$REPO"
-git pull --ff-only || true
+# No `|| true`: a diverged or dirty tree must stop the deploy, not silently
+# rebuild the previous commit and print "Deployed."
+git pull --ff-only
 
 echo "==> Building backend image"
 docker build -t aasrah-backend ./backend
@@ -38,7 +40,32 @@ docker run -d \
   --restart unless-stopped \
   --network aasrah-net \
   --env-file /home/ec2-user/aasrah.env \
+  -v aasrah_uploads:/app/uploads \
+  --log-opt max-size=10m --log-opt max-file=3 \
   aasrah-backend
+
+# -v aasrah_uploads: WITHOUT this, `docker rm -f` above destroys the container's
+# writable layer on every deploy, taking every uploaded rescue photo with it.
+# The report_image rows survive, so the UI renders broken tiles forever.
+# --log-opt: the default json-file driver grows unbounded until the 8GB root
+# volume fills, which takes down Docker itself.
+
+echo "==> Applying database migrations"
+docker exec aasrah-backend python -m scripts.init_db
+
+echo "==> Waiting for the new container to report healthy"
+for i in $(seq 1 30); do
+  if docker exec aasrah-backend python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/db', timeout=2).status==200 else 1)" 2>/dev/null; then
+    echo "    healthy after ${i}s"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "!!! Backend did not become healthy. Recent logs:" >&2
+    docker logs --tail 50 aasrah-backend >&2
+    exit 1
+  fi
+  sleep 1
+done
 
 echo "==> Writing Caddyfile for $API_HOST"
 cat > /home/ec2-user/Caddyfile <<EOF

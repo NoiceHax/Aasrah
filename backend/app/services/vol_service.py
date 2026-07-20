@@ -15,6 +15,7 @@ from app.models.report import Report
 from app.models.volunteer import Volunteer
 from app.models.volunteer_assignment import VolunteerAssignment
 from app.services.audit import add_timeline_event, notify, record_audit
+from app.services.ngo_reports import apply_status_transition
 from app.services.security_sanitize import sanitize_text
 
 # Volunteer-driven assignment transitions and the report status they imply.
@@ -80,7 +81,7 @@ class VolService:
             actor_id=actor_id, is_public=accept,
         )
         if accept and report.status == ReportStatus.VOLUNTEER_ASSIGNED:
-            report.status = ReportStatus.VOLUNTEER_ACCEPTED
+            apply_status_transition(report, ReportStatus.VOLUNTEER_ACCEPTED)
         if report.claimed_by and report.claimed_by.owner_id:
             notify(
                 self.db, user_id=report.claimed_by.owner_id,
@@ -110,7 +111,9 @@ class VolService:
         report = a.report
         new_report_status = _REPORT_STATUS_FOR.get(target)
         if new_report_status and report.claimed_by_ngo_id:
-            report.status = new_report_status
+            # ARRIVED and IN_PROGRESS both map onto REACHED_LOCATION, so the
+            # second one is a legitimate no-op rather than an illegal edge.
+            apply_status_transition(report, new_report_status, allow_noop=True)
         add_timeline_event(
             self.db, report_id=report.id, event_type=new_report_status.value if new_report_status else target.value,
             title=_TIMELINE_TITLES.get(target, target.value.title()), actor_id=actor_id, is_public=True,
@@ -129,6 +132,16 @@ class VolService:
         if a.status not in (AssignmentStatus.IN_PROGRESS, AssignmentStatus.ARRIVED):
             raise ValidationError("Assignment must be in progress to complete", code="invalid_transition")
         now = datetime.now(timezone.utc)
+        report = a.report
+        # Guard the report transition BEFORE mutating the assignment or the
+        # volunteer's metrics: a CLOSED/REJECTED case must not be resurrected,
+        # and a rejected completion must not leave counters incremented.
+        if report.claimed_by_ngo_id:
+            apply_status_transition(report, ReportStatus.RESCUE_COMPLETED)
+            # Stamp a canonical completion time so analytics bucket it
+            # correctly — once only, never overwriting an earlier stamp.
+            if report.closed_at is None:
+                report.closed_at = now
         a.status = AssignmentStatus.COMPLETED
         a.completed_at = now
         a.notes = sanitize_text(notes)
@@ -138,11 +151,6 @@ class VolService:
         volunteer.completed_rescues += 1
         if hours:
             volunteer.total_hours += hours
-        report = a.report
-        if report.claimed_by_ngo_id:
-            report.status = ReportStatus.RESCUE_COMPLETED
-            # Stamp a canonical completion time so analytics bucket it correctly.
-            report.closed_at = now
         add_timeline_event(
             self.db, report_id=report.id, event_type="rescue_completed",
             title="Rescue Completed", description=notes, actor_id=actor_id, is_public=True,
