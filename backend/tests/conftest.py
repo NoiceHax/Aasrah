@@ -24,6 +24,11 @@ os.environ.setdefault("DEBUG", "true")
 # Effectively disable rate limiting in tests (many logins share one client IP).
 os.environ.setdefault("RATE_LIMIT_DEFAULT", "100000/minute")
 os.environ.setdefault("RATE_LIMIT_AUTH", "100000/minute")
+# Same for the per-route limits: the whole suite shares one client IP, so a
+# real ceiling here fails tests as an artefact of how many tests exist.
+os.environ.setdefault("RATE_LIMIT_TRACK", "100000/minute")
+os.environ.setdefault("RATE_LIMIT_REPORT_CREATE", "100000/minute")
+os.environ.setdefault("RATE_LIMIT_UPLOAD", "100000/minute")
 # No background worker pool / scheduler under tests; jobs run inline.
 os.environ.setdefault("RUN_BACKGROUND_WORKERS", "false")
 

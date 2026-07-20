@@ -57,25 +57,37 @@ class Metrics:
 metrics = Metrics()
 
 
+def _route_label(request: Request) -> str:
+    """Route *template* for a request, e.g. `/api/v1/reports/{report_id}`.
+
+    Must be called after the request has passed through the router: Starlette
+    populates `scope["route"]` downstream of this middleware, so reading it
+    before `call_next` always yields None. Falling back to the concrete path
+    there would key metrics on live tracking IDs and report UUIDs — leaking
+    them through /metrics and growing the registry without bound.
+
+    Unmatched paths (404 scans) collapse to a single label for the same reason.
+    """
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or "__unmatched__"
+
+
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
         start = time.perf_counter()
-        # Route template (not the concrete path) keeps cardinality bounded.
-        route = request.scope.get("route")
-        route_label = getattr(route, "path", request.url.path)
 
         try:
             response = await call_next(request)
         except Exception:
             duration_ms = (time.perf_counter() - start) * 1000
-            metrics.observe(route_label, 500, duration_ms)
+            metrics.observe(_route_label(request), 500, duration_ms)
             logger.exception("rid=%s %s %s -> 500 (%.1fms)",
                              request_id, request.method, request.url.path, duration_ms)
             raise
 
         duration_ms = (time.perf_counter() - start) * 1000
-        metrics.observe(route_label, response.status_code, duration_ms)
+        metrics.observe(_route_label(request), response.status_code, duration_ms)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{duration_ms:.1f}"
         logger.info("rid=%s %s %s -> %d (%.1fms)",

@@ -6,11 +6,11 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useToast } from "@/components/notifications/toast";
 import { tokenStore } from "@/lib/api/token-store";
 import { ensureFreshToken } from "@/lib/api/client";
+import { API_BASE_URL } from "@/lib/api/config";
 import type { NotificationType, RealtimeEvent } from "@/lib/api/types";
 
 function wsUrl(token: string): string {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-  const wsBase = base.replace(/^http/, "ws");
+  const wsBase = API_BASE_URL.replace(/^http/, "ws");
   return `${wsBase}/ws?token=${encodeURIComponent(token)}`;
 }
 
@@ -95,11 +95,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         case "report_created": {
-          const p = event.payload as { tracking_id?: string; priority?: string };
-          toast.info(
-            "New report received",
-            p.tracking_id ? `${p.tracking_id} · ${p.priority ?? ""}`.trim() : undefined,
-          );
+          // The event is intentionally content-free — it says "something
+          // changed", nothing about which report or where. Details arrive via
+          // the authorized refetches below, which are scoped per viewer.
+          toast.info("New report received");
           // A new report affects admin metrics, NGO discovery, and public stats.
           qc.invalidateQueries({ queryKey: ["admin"] });
           qc.invalidateQueries({ queryKey: ["ngo"] });

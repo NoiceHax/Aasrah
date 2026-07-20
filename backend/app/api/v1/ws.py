@@ -46,7 +46,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = "") -> None:
         return
 
     await websocket.accept()
-    queue = await bus.subscribe(user_id)
+    # Role is captured from the database (not the token claim) so the bus can
+    # scope events to an audience; see EventBus.publish_to_roles.
+    queue = await bus.subscribe(user_id, role=account.role.value)
     await websocket.send_json({"type": "connected", "payload": {"user_id": user_id}})
 
     try:

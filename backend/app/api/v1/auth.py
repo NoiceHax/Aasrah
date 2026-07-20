@@ -97,7 +97,7 @@ def forgot_password(
         queue_email(body.email, email_templates.password_reset("there", reset_url))
     return ForgotPasswordResponse(
         message="If an account exists for that email, a reset link has been sent.",
-        reset_token=reset_token if settings.DEBUG else None,
+        reset_token=reset_token if not settings.is_production else None,
     )
 
 

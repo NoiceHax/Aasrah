@@ -19,6 +19,8 @@ class ReportCreate(BaseModel):
     longitude: float | None = Field(default=None, ge=-180, le=180)
     reporter_name: str | None = Field(default=None, max_length=255)
     reporter_phone: str | None = Field(default=None, max_length=32)
+    # Reporter-declared; None = not answered. Forces CRITICAL priority when True.
+    subject_is_minor: bool | None = None
 
 
 class ReportImageOut(BaseModel):
@@ -53,6 +55,7 @@ class ReportOut(BaseModel):
     address: str | None
     latitude: float | None
     longitude: float | None
+    subject_is_minor: bool | None = None
     created_at: datetime
     updated_at: datetime
     images: list[ReportImageOut] = []
@@ -63,6 +66,9 @@ class ReportCreateResponse(BaseModel):
     status: ReportStatus
     created_at: datetime
     report_id: uuid.UUID
+    # Short-lived capability for the follow-up image upload on this report.
+    # The client should hold it in memory only and never persist it.
+    upload_token: str
 
 
 class NgoReportListItem(BaseModel):
@@ -156,17 +162,23 @@ class AnalysisOverrideRequest(BaseModel):
 
 
 class ReportTrackingOut(BaseModel):
-    """Public-facing tracking view: no sensitive reporter contact details."""
+    """Public-facing tracking view, served with no authentication.
+
+    Answers one question — "has anyone picked this up yet?" — and nothing more.
+
+    Deliberately excludes `description`, precise `latitude`/`longitude`, and
+    `images`. The reporter's contact details were already withheld here, but
+    the *subject's* free-text description, exact coordinates, and photographs
+    are the more sensitive payload, and anyone holding a tracking ID could read
+    them. `locality` is a coarsened stand-in for the address so a reporter can
+    still recognise their own report.
+    """
 
     tracking_id: str
     situation: SituationType
     priority: ReportPriority
     status: ReportStatus
-    description: str
-    address: str | None
-    latitude: float | None
-    longitude: float | None
+    locality: str | None = None
     created_at: datetime
     updated_at: datetime
-    images: list[ReportImageOut] = []
     timeline: list[TimelineEvent] = []

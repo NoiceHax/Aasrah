@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.models.enums import ReportStatus
+from app.models.enums import ReportPriority, ReportStatus, SituationType
 from app.models.report import Report
 from app.models.report_image import ReportImage
 from app.models.user import User
@@ -73,7 +73,19 @@ class ReportService:
             longitude=data.longitude,
             reporter_name=sanitize_text(data.reporter_name),
             reporter_phone=sanitize_text(data.reporter_phone),
+            subject_is_minor=data.subject_is_minor,
         )
+
+        # Child-safety pin. A human explicitly stating that the subject is a
+        # child (or filing under child protection) outranks any inferred score:
+        # under the JJ Act / POCSO this is mandatory-reporting territory, so the
+        # case must not sit below CRITICAL. `priority_auto = False` stops the
+        # background AI scorer from downgrading it later, and this override wins
+        # over whatever `priority` the client sent.
+        if data.subject_is_minor is True or data.situation == SituationType.CHILD_PROTECTION:
+            report.priority = ReportPriority.CRITICAL
+            report.priority_auto = False
+
         return self.repo.add(report)
 
     def attach_images(self, report: Report, files: list[tuple[bytes, str | None]]) -> None:

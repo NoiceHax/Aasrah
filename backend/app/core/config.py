@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     # App
     PROJECT_NAME: str = "Aasrah API"
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
-    DEBUG: bool = True
+    # Default off: DEBUG relaxes developer-convenience behaviour (see the reset
+    # flow in api/v1/auth.py). A deploy that forgets to set it must be safe.
+    DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
@@ -39,6 +41,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+    # Window for an anonymous reporter to attach photos to the report they just
+    # filed. Long enough for a slow mobile upload, short enough to be useless
+    # to anyone who scrapes the token later.
+    UPLOAD_TOKEN_EXPIRE_MINUTES: int = 15
 
     # CORS (comma-separated string in env; use `cors_origins` for the parsed list)
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
@@ -51,6 +57,15 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_DEFAULT: str = "200/minute"
     RATE_LIMIT_AUTH: str = "10/minute"
+    # Public, unauthenticated tracking lookup. Tight because the tracking-ID
+    # keyspace is small enough to walk without one.
+    RATE_LIMIT_TRACK: str = "10/minute"
+    # Anonymous report submission and its follow-up image upload. Settings
+    # rather than literals so the ceiling can be raised during a surge without
+    # a code change -- this is the one limit that, set wrong, turns away real
+    # reports about people in danger.
+    RATE_LIMIT_REPORT_CREATE: str = "30/minute"
+    RATE_LIMIT_UPLOAD: str = "30/minute"
 
     # External services
     NOMINATIM_BASE_URL: str = "https://nominatim.openstreetmap.org"
@@ -63,6 +78,19 @@ class Settings(BaseSettings):
     AI_VISION_MODEL: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     AI_TEXT_MODEL: str = "openai/gpt-oss-120b"
     AI_TIMEOUT_SECONDS: float = 30.0
+    # Vision analysis is OFF by default and must be opted into explicitly.
+    #
+    # Reason: sending a report photograph to the model means base64-encoding a
+    # photograph of an identifiable person -- frequently a person in distress,
+    # sometimes a child -- and transmitting it to a third-party processor
+    # outside the deployment's jurisdiction, where the model is asked to infer
+    # age band and gender. That is biometric-adjacent profiling of a data
+    # subject who never consented (reports are filed *about* people, by someone
+    # else) and it needs a lawful basis, a processing agreement with the
+    # provider, and a disclosure in the privacy notice before it may run.
+    # Those are deployment decisions, so the default is off and the operator
+    # turns it on once they have them. Text summarisation is unaffected.
+    AI_VISION_ENABLED: bool = False
 
     # Email (SMTP). Without a host, emails are rendered + logged as a preview.
     SMTP_HOST: str | None = None
@@ -84,6 +112,17 @@ class Settings(BaseSettings):
     @property
     def ai_enabled(self) -> bool:
         return bool(self.NVIDIA_API_KEY)
+
+    @property
+    def ai_vision_enabled(self) -> bool:
+        """Third-party image analysis: needs BOTH a key and an explicit opt-in.
+
+        Deliberately a separate gate from `ai_enabled`: configuring a key to get
+        text summaries must never silently start shipping photographs of data
+        subjects to an external processor. When this is False the vision path
+        degrades to the local heuristic, which reads only the report's own text.
+        """
+        return bool(self.NVIDIA_API_KEY) and self.AI_VISION_ENABLED
 
     @property
     def smtp_enabled(self) -> bool:
@@ -128,7 +167,16 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        # `docker run --env-file` does no shell parsing, so quotes written in
+        # the env file survive into the value and would never match a browser's
+        # Origin header. Strip them, along with any trailing slash, since the
+        # Origin header never carries a path.
+        origins: list[str] = []
+        for raw in self.CORS_ORIGINS.split(","):
+            origin = raw.strip().strip("\"'").rstrip("/")
+            if origin:
+                origins.append(origin)
+        return origins
 
     @property
     def max_upload_size_bytes(self) -> int:

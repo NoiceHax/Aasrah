@@ -56,5 +56,8 @@ class MessageResponse(BaseModel):
 
 
 class ForgotPasswordResponse(MessageResponse):
-    # Returned only in development to ease testing without an email service.
+    # Populated only outside production, to ease testing without an email
+    # service. Gating on ENVIRONMENT (not DEBUG) is deliberate: a production
+    # deploy that accidentally enables DEBUG must still never hand a reset
+    # token to an unauthenticated caller.
     reset_token: str | None = None
