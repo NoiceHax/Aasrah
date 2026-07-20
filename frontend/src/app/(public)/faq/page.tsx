@@ -45,7 +45,7 @@ const faqGroups = [
         id: "r5",
         question: "What if the situation is urgent and requires immediate emergency services?",
         answer:
-          "Aasrah is not a substitute for emergency services. If someone's life is in immediate danger, call your local emergency number (112, 911, etc.) first. Aasrah coordinates humanitarian support, not emergency dispatch.",
+          "Aasrah is not a substitute for emergency services and does not provide emergency dispatch. If someone's life is in immediate danger, call 112 (all emergencies), 108 (ambulance), 1098 (child helpline) or 181 (women's helpline) first, then file the report. Aasrah coordinates humanitarian support afterwards.",
       },
       {
         id: "r6",
