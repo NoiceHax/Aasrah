@@ -16,8 +16,9 @@ export default function OfflinePage() {
       </div>
       <h1 className="text-headline-md text-primary">You&apos;re offline</h1>
       <p className="mt-3 max-w-md text-body-md text-on-surface-variant">
-        Some features are unavailable without a connection. Cached pages still work, and any
-        updates you make will sync when you&apos;re back online.
+        Some features are unavailable without a connection. Previously-viewed pages still work,
+        but anything you submit while offline will not be saved &mdash; please reconnect and try
+        again.
       </p>
       <Button href={routes.home} leadingIcon="refresh" className="mt-8">
         Try again

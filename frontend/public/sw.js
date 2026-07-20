@@ -1,6 +1,17 @@
-/* Aasrah service worker: app-shell caching, push, background sync. */
-const CACHE = "aasrah-v1";
+/* Aasrah service worker: app-shell caching and web push.
+
+   Note: there is no offline submission queue. Anything submitted without a
+   connection is NOT saved — do not add a "will sync later" promise to the UI
+   unless a real IndexedDB queue is implemented behind it. */
+const CACHE = "aasrah-v2";
 const APP_SHELL = ["/", "/offline"];
+
+/* Never cache signed-in pages. The cache is origin-scoped and shared across
+   accounts, so on a shared field device the next user would be served the
+   previous user's portal/admin shell. */
+const PRIVATE_PREFIXES = ["/portal", "/admin", "/volunteer-portal"];
+const isPrivate = (pathname) =>
+  PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)).catch(() => {}));
@@ -23,6 +34,12 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.pathname.startsWith("/api")) return;
 
   if (request.mode === "navigate") {
+    if (isPrivate(url.pathname)) {
+      // Authenticated shell: network-only, and fall back to the generic
+      // offline page rather than a cached copy of someone's dashboard.
+      event.respondWith(fetch(request).catch(() => caches.match("/offline")));
+      return;
+    }
     event.respondWith(
       fetch(request)
         .then((resp) => {
@@ -62,13 +79,6 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(self.clients.openWindow("/"));
 });
 
-// Background sync hook for queued volunteer updates (see offline-queue.ts).
-self.addEventListener("sync", (event) => {
-  if (event.tag === "aasrah-sync") {
-    event.waitUntil(
-      self.clients.matchAll().then((clients) => {
-        clients.forEach((c) => c.postMessage({ type: "flush-queue" }));
-      }),
-    );
-  }
-});
+// No "sync" handler: nothing registers the tag and there is no queue to flush.
+// A handler here previously implied an offline-submission feature that does
+// not exist. Reinstate it together with a real IndexedDB queue, not before.

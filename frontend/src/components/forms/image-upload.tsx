@@ -21,6 +21,7 @@ interface ImageUploadProps {
 
 export function ImageUpload({ files, onChange, max = 6, onError }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   // Revoke object URLs on unmount to avoid leaks.
@@ -81,17 +82,44 @@ export function ImageUpload({ files, onChange, max = 6, onError }: ImageUploadPr
             : "border-outline-variant bg-surface-container-low hover:border-secondary/50",
         )}
       >
-        <Icon name="add_photo_alternate" className="text-[32px] text-secondary" />
-        <span className="text-label-md font-semibold text-primary">
-          Drag images here, or click to browse
-        </span>
+        <Icon name="photo_camera" className="text-[32px] text-secondary" />
+        <span className="text-label-md font-semibold text-primary">Take a photo</span>
         <span className="text-label-sm text-on-surface-variant">
-          JPEG, PNG, or WEBP · up to {MAX_MB}MB each · max {max} images
+          Or drag images here · JPEG, PNG, or WEBP · up to {MAX_MB}MB each · max {max} images
         </span>
       </button>
 
+      <button
+        type="button"
+        onClick={() => galleryRef.current?.click()}
+        className="self-center text-label-sm text-on-surface-variant underline underline-offset-2 hover:text-primary"
+      >
+        Choose an existing photo instead
+      </button>
+
+      {/*
+        Two inputs rather than one: `capture` asks the device to open the
+        camera directly, which is the right default when someone is standing
+        in front of the situation they are reporting. It is only a hint —
+        authorisation is enforced server-side by the upload token — and it
+        must not be the only option, since plenty of genuine reports are filed
+        from a photo taken minutes earlier.
+      */}
       <input
         ref={inputRef}
+        type="file"
+        accept={ACCEPTED.join(",")}
+        capture="environment"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      <input
+        ref={galleryRef}
         type="file"
         accept={ACCEPTED.join(",")}
         multiple
@@ -114,7 +142,10 @@ export function ImageUpload({ files, onChange, max = 6, onError }: ImageUploadPr
               <button
                 type="button"
                 onClick={() => removeAt(i)}
-                className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary/80 text-on-primary opacity-0 transition-opacity group-hover:opacity-100"
+                // Visible by default, dimmed on pointer devices until hover.
+                // A hover-only affordance is unreachable on a phone — which is
+                // where most reports are filed — and invisible to keyboard focus.
+                className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary/80 text-on-primary transition-opacity focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                 aria-label={`Remove ${f.file.name}`}
               >
                 <Icon name="close" className="text-[16px]" />

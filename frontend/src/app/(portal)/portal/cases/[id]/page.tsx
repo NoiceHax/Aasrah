@@ -18,7 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/notifications/toast";
 import { ngoApi } from "@/lib/api/ngo";
-import { resolveImageUrl } from "@/lib/api/endpoints";
+import { AuthedImage } from "@/components/ui/authed-image";
+import { EmergencyBanner } from "@/components/safety/emergency-banner";
 import { normalizeError } from "@/lib/api/client";
 import { nextStatuses, STATUS_LABELS } from "@/lib/rescue-workflow";
 import type { ReportStatus } from "@/lib/api/types";
@@ -138,6 +139,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         {tab === "overview" && (
           <div className="grid gap-gutter lg:grid-cols-3">
             <div className="space-y-gutter lg:col-span-2">
+              {/* Some situations are beyond what a humanitarian responder should
+                  handle alone. Surface the escalation route on the case itself
+                  rather than expecting staff to remember it. */}
+              <EmergencyBanner />
               <Card className="p-stack-md">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <PriorityBadge priority={c.priority} />
@@ -159,11 +164,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                   <h3 className="mb-3 text-headline-sm text-primary">Photos</h3>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {c.images.map((img) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <AuthedImage
                         key={img.id}
-                        src={resolveImageUrl(img.url)}
-                        alt="Report"
+                        src={img.url}
+                        alt="Report photo"
                         className="aspect-square w-full rounded-md border border-outline-variant object-cover"
                       />
                     ))}
