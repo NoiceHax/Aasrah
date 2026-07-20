@@ -23,10 +23,14 @@ logger = get_logger(__name__)
 ADMIN_EMAIL = "admin@aasrah.org"
 ADMIN_PASSWORD = "ChangeMe123!"  # noqa: S105  dev seed only
 
-SEED_NGOS = [
-    {"name": "Hope Foundation", "focus_area": "Disaster Relief", "location": "Metropolis, NY"},
-    {"name": "Rescue International", "focus_area": "Search & Rescue", "location": "Coastal District"},
-]
+# No placeholder NGOs. These used to be seeded here as `is_verified=True`, which
+# meant fictional orgs ("Hope Foundation", "Rescue International") showed up in
+# the *public* verified-NGO directory as if they were real partners -- a
+# credibility problem the moment a real NGO looks at the live site. Real NGOs
+# are created and verified by an admin, never seeded. `scripts.seed_phase3` still
+# creates a demo NGO, but that is an explicit, separately-invoked demo path and
+# must not be run against a deployment you are showing to partners.
+SEED_NGOS: list[dict] = []
 
 
 def main() -> None:
