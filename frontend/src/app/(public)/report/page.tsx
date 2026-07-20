@@ -9,7 +9,7 @@ import { howItWorks } from "@/lib/mock-data";
 export const metadata: Metadata = {
   title: "Report a Person",
   description:
-    "Report a person in need of urgent humanitarian assistance. Provide a location and details, and a verified NGO will be dispatched.",
+    "Report a person in need of humanitarian assistance. Provide a location and details, and the report is routed to verified NGOs serving that area.",
 };
 
 export default function ReportPage() {
@@ -18,7 +18,7 @@ export default function ReportPage() {
       <PageHeader
         eyebrow="Help a Person"
         title="Report someone who needs help"
-        description="Share a location and what you've observed. Our coordination team verifies every report and routes it to the nearest verified NGO."
+        description="Share a location and what you've observed. Reports are reviewed and routed to verified NGOs serving that area. Aasrah is not an emergency service — see the numbers below."
       />
 
       <Container className="py-16">

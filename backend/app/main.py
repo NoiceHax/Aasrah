@@ -5,20 +5,22 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import __version__
+from app.api.deps import require_roles
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.observability import ObservabilityMiddleware, metrics
 from app.core.rate_limit import limiter
+from app.models.enums import UserRole
+from app.models.user import User
 
 configure_logging()
 logger = get_logger(__name__)
@@ -69,6 +71,10 @@ async def lifespan(_: FastAPI):
     logger.info(
         "%s v%s starting in %s mode", settings.PROJECT_NAME, __version__, settings.ENVIRONMENT
     )
+    # A browser request from an origin not on this list is rejected before it
+    # reaches any route, which looks like a generic network failure in the
+    # frontend. Log the effective list so it can be checked without a redeploy.
+    logger.info("CORS allowed origins: %s", settings.cors_origins)
     scheduler = None
     if settings.RUN_BACKGROUND_WORKERS:
         runner.start()
@@ -88,9 +94,11 @@ def create_app() -> FastAPI:
         title=settings.PROJECT_NAME,
         version=__version__,
         description="Backend API for the Aasrah Humanitarian Response Platform.",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        # The interactive explorer is a complete inventory of the API surface.
+        # Useful everywhere except production, where it only helps an attacker.
+        docs_url=None if settings.is_production else "/docs",
+        redoc_url=None if settings.is_production else "/redoc",
+        openapi_url=None if settings.is_production else "/openapi.json",
         lifespan=lifespan,
     )
 
@@ -122,10 +130,12 @@ def create_app() -> FastAPI:
     # API routes (versioned)
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
-    # Serve locally-stored uploads (local StorageBackend).
-    upload_dir = Path(settings.UPLOAD_DIR).resolve()
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+    # Locally-stored uploads are NOT served as static files. Report photographs
+    # and case attachments (medical documents) are personal data about
+    # vulnerable people; a static mount makes every stored byte world-readable
+    # to anyone who learns or guesses a URL, with no auth and no expiry.
+    # They are served by the authorized endpoint in app/api/v1/files.py instead.
+    Path(settings.UPLOAD_DIR).resolve().mkdir(parents=True, exist_ok=True)
 
     @app.get("/", tags=["meta"])
     def root() -> dict:
@@ -137,8 +147,13 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/metrics", tags=["meta"])
-    def metrics_endpoint() -> dict:
-        """In-process request/latency metrics (lightweight, no auth)."""
+    def metrics_endpoint(_: User = Depends(require_roles(UserRole.ADMIN))) -> dict:
+        """In-process request/latency metrics. Admin-only.
+
+        This route sits outside API_V1_PREFIX, so it inherits no router-level
+        guard and must declare its own. The same data is served to the admin
+        console via /api/v1/admin/monitoring.
+        """
         return metrics.snapshot()
 
     return app

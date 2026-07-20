@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
 import { FieldShell } from "@/components/ui/field";
+import { EmergencyBanner } from "@/components/safety/emergency-banner";
 import { ReportSuccess } from "./report-success";
 import { ImageUpload, type PreviewFile } from "./image-upload";
 import { DynamicLocationPicker, type LatLng } from "@/components/maps/dynamic-location-picker";
@@ -26,10 +26,20 @@ const urgencyOptions = [
 
 const situationOptions = [
   { value: "medical", label: "Medical emergency" },
+  { value: "child_protection", label: "Child at risk / unaccompanied minor" },
   { value: "shelter", label: "Shelter / homelessness" },
   { value: "food", label: "Food / water" },
   { value: "safety", label: "Personal safety" },
   { value: "other", label: "Other" },
+];
+
+// Reporter-declared. The server pins any report about a child to CRITICAL and
+// will not let automated scoring downgrade it, so this must be a real question
+// on the form rather than something inferred from the photo.
+const minorOptions = [
+  { value: "", label: "Not sure" },
+  { value: "yes", label: "Yes, under 18" },
+  { value: "no", label: "No, an adult" },
 ];
 
 type Errors = Partial<Record<"situation" | "urgency" | "description" | "location", string>>;
@@ -38,6 +48,7 @@ export function ReportForm() {
   const toast = useToast();
 
   const [situation, setSituation] = useState("");
+  const [subjectIsMinor, setSubjectIsMinor] = useState("");
   const [urgency, setUrgency] = useState("");
   const [description, setDescription] = useState("");
   const [reporterName, setReporterName] = useState("");
@@ -52,6 +63,8 @@ export function ReportForm() {
     mutationFn: async () => {
       const created = await reportsApi.create({
         situation: situation as SituationType,
+        subject_is_minor:
+          subjectIsMinor === "" ? null : subjectIsMinor === "yes",
         priority: urgency as ReportPriority,
         description,
         address: address || null,
@@ -65,6 +78,7 @@ export function ReportForm() {
           await reportsApi.uploadImages(
             created.report_id,
             images.map((i) => i.file),
+            created.upload_token,
           );
         } catch (e) {
           // Report is saved; surface a soft warning about the images.
@@ -105,6 +119,7 @@ export function ReportForm() {
 
   const reset = () => {
     setSituation("");
+    setSubjectIsMinor("");
     setUrgency("");
     setDescription("");
     setReporterName("");
@@ -127,13 +142,7 @@ export function ReportForm() {
   return (
     <Card className="p-stack-lg">
       <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
-        <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3">
-          <Icon name="emergency" className="mt-0.5 text-[20px] text-on-warning-soft" />
-          <p className="text-body-sm text-on-warning-soft">
-            If someone is in immediate, life-threatening danger, contact your local emergency
-            services first, then file this report.
-          </p>
-        </div>
+        <EmergencyBanner />
 
         {/* Location */}
         <FieldShell
@@ -173,6 +182,15 @@ export function ReportForm() {
             value={urgency}
             onChange={(e) => setUrgency(e.target.value)}
             error={errors.urgency}
+          />
+          <Select
+            name="subject_is_minor"
+            label="Is the person under 18?"
+            placeholder="Not sure"
+            options={minorOptions}
+            value={subjectIsMinor}
+            onChange={(e) => setSubjectIsMinor(e.target.value)}
+            hint="Reports involving a child are treated as critical."
           />
         </div>
 

@@ -41,8 +41,12 @@ class LocalStorageBackend(StorageBackend):
 
     def _path(self, key: str) -> Path:
         # Prevent path traversal: keys are app-generated, but be defensive.
+        # A string prefix test is not containment -- with base_dir
+        # "/app/uploads", the resolved path "/app/uploads_evil/secret" starts
+        # with the base string yet lives outside the directory. is_relative_to
+        # compares path components, so only true descendants pass.
         path = (self.base_dir / key).resolve()
-        if not str(path).startswith(str(self.base_dir)):
+        if not path.is_relative_to(self.base_dir):
             raise ValueError("Invalid storage key")
         return path
 
@@ -55,8 +59,10 @@ class LocalStorageBackend(StorageBackend):
         return key
 
     def url_for(self, key: str) -> str:
-        # Served by the app under /uploads (see main.py static mount).
-        return f"/uploads/{key}"
+        # Served by the authorized file endpoint (app/api/v1/files.py), never
+        # by a static mount: the bytes are personal data and each read has to
+        # go through the same ownership checks as the metadata.
+        return f"{settings.API_V1_PREFIX}/files/{key}"
 
     def delete(self, key: str) -> None:
         try:

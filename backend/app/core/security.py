@@ -13,7 +13,7 @@ from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-TokenType = Literal["access", "refresh", "reset"]
+TokenType = Literal["access", "refresh", "reset", "upload"]
 
 
 def hash_password(password: str) -> str:
@@ -72,6 +72,21 @@ def create_password_reset_token(subject: str) -> str:
         subject,
         "reset",
         timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES),
+    )
+
+
+def create_upload_token(report_id: str) -> str:
+    """Short-lived capability to attach images to one specific report.
+
+    Reporting is anonymous by design, so there is no account to authorise the
+    follow-up image upload against. This scopes that upload to the report just
+    created, for a few minutes, instead of leaving the endpoint open to anyone
+    holding (or guessing) a report UUID.
+    """
+    return _create_token(
+        report_id,
+        "upload",
+        timedelta(minutes=settings.UPLOAD_TOKEN_EXPIRE_MINUTES),
     )
 
 

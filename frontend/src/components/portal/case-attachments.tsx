@@ -7,7 +7,8 @@ import { Select } from "@/components/ui/select";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/notifications/toast";
 import { ngoApi } from "@/lib/api/ngo";
-import { resolveImageUrl } from "@/lib/api/endpoints";
+import { AuthedImage } from "@/components/ui/authed-image";
+import { downloadAuthedFile } from "@/lib/api/endpoints";
 import { normalizeError } from "@/lib/api/client";
 
 const categories = [
@@ -90,9 +91,8 @@ export function CaseAttachments({ reportId }: { reportId: string }) {
         {attachments?.map((att) => (
           <div key={att.id} className="group relative overflow-hidden rounded-lg border border-outline-variant">
             {isImage(att.content_type) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={resolveImageUrl(att.url)}
+              <AuthedImage
+                src={att.url}
                 alt={att.original_filename ?? "attachment"}
                 className="aspect-square w-full object-cover"
               />
@@ -107,15 +107,14 @@ export function CaseAttachments({ reportId }: { reportId: string }) {
             <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-primary/80 px-2 py-1">
               <span className="truncate text-label-sm text-on-primary">{att.category.replace(/_/g, " ")}</span>
               <div className="flex gap-1">
-                <a
-                  href={resolveImageUrl(att.url)}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => downloadAuthedFile(att.url, att.original_filename ?? undefined)}
                   className="text-on-primary hover:text-secondary-fixed-dim"
                   title="Open"
                 >
                   <Icon name="download" className="text-[16px]" />
-                </a>
+                </button>
                 <button
                   type="button"
                   onClick={() => deleteMutation.mutate(att.id)}

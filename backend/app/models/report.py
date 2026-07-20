@@ -62,6 +62,20 @@ class Report(Base, UUIDMixin, TimestampMixin):
     children_present: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     people_count: Mapped[int | None] = mapped_column(Integer)
 
+    # Reporter-declared answer to "is the person you are reporting a minor?".
+    # Deliberately DISTINCT from `children_present`, which is AI/NGO-derived:
+    # this is a human's explicit statement and AI must never overwrite it.
+    # NULL means "not answered", which is not the same as False.
+    subject_is_minor: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=None,
+        comment=(
+            "Reporter-declared: subject is a minor. Distinct from the AI-derived "
+            "children_present flag; never overwritten by AI."
+        ),
+    )
+
     # Claiming NGO + lifecycle timestamps
     claimed_by_ngo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("ngos.id", ondelete="SET NULL"), nullable=True
@@ -103,6 +117,12 @@ class Report(Base, UUIDMixin, TimestampMixin):
         Index("ix_reports_status", "status"),
         Index("ix_reports_priority", "priority"),
         Index("ix_reports_created_at", "created_at"),
+        # Hottest predicate in the app: NGO dashboard, claimed list, insights.
+        Index("ix_reports_claimed_by_ngo_id", "claimed_by_ngo_id"),
+        # "my NGO's cases in state X" — the dashboard's default query shape.
+        Index("ix_reports_ngo_status", "claimed_by_ngo_id", "status"),
+        # Bounding-box "nearby" lookups filter on both coordinates.
+        Index("ix_reports_lat_lon", "latitude", "longitude"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover

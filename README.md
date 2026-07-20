@@ -37,7 +37,7 @@ analytics, testing, and production tooling.
 - 🗺️ **Maps & geo**: Leaflet + OpenStreetMap for report location, service-area discovery (haversine), and rescue heatmaps.
 - ⚙️ **Automation & jobs**: an in-process background worker pool + a scheduler running configurable rules (escalate unclaimed, close inactive, weekly summaries).
 - 📊 **Observability**: request-ID + latency middleware, a `/metrics` endpoint, an admin monitoring dashboard, audit logs, and entity version history.
-- 📱 **PWA**: installable, offline app-shell caching, background sync, and web-push notifications.
+- 📱 **PWA**: installable, offline app-shell caching, and web-push notifications. (Offline *submission* queuing is not implemented; anything submitted without a connection is not saved.)
 
 ## Screenshots
 
@@ -113,7 +113,7 @@ graph TD
 Full **HLD/LLD, ER diagram, sequence diagrams, scaling strategy, security model,
 and trade-off analysis** live in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 The engineering story (challenges, decisions, and lessons) is in
-**[docs/PORTFOLIO.md](docs/PORTFOLIO.md)**. Deploying it (Vercel + Render, env,
+**[docs/PORTFOLIO.md](docs/PORTFOLIO.md)**. Deploying it (Vercel + EC2, env,
 migrations, rollback) is in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 ## Quick start
@@ -183,7 +183,7 @@ Versioned under `/api/v1`; interactive docs at `/docs` (Swagger) and `/redoc`.
 ## Testing
 
 ```bash
-cd backend && pytest          # 24 tests: auth, reporting, full rescue lifecycle, admin, units
+cd backend && pytest          # 72 tests: auth, reporting, full rescue lifecycle, admin, access-control regressions, units
 ```
 CI (`.github/workflows/ci.yml`) runs backend lint + tests and frontend lint + build on every push/PR.
 

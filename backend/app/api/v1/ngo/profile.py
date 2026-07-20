@@ -41,7 +41,20 @@ def update_profile(
     db: Session = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
 ) -> NgoOut:
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+
+    # An NGO may move its service area but not delete it. Nulling the
+    # coordinates used to widen discovery to every report on the platform;
+    # discovery now fails closed, so the effect today is that the NGO silently
+    # sees nothing. Either way it is not a state they should be able to reach.
+    for coord in ("service_latitude", "service_longitude"):
+        if coord in updates and updates[coord] is None:
+            raise ValidationError(
+                "Service area coordinates cannot be cleared. Set a new location instead.",
+                code="service_area_required",
+            )
+
+    for field, value in updates.items():
         setattr(ngo, field, value)
     db.commit()
     db.refresh(ngo)

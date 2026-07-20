@@ -164,7 +164,7 @@ export const faqs: Faq[] = [
     id: "f1",
     question: "Who can submit a report?",
     answer:
-      "Anyone can report a person in need. No account is required. Reports can be filed anonymously and are always reviewed.",
+      "Anyone can report a person in need. No account is required, and reports can be filed anonymously. Reports are reviewed and routed to verified NGOs serving that area; Aasrah does not guarantee a response time and is not an emergency service.",
   },
   {
     id: "f2",

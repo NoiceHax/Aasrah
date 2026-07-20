@@ -12,7 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/notifications/toast";
 import { Select } from "@/components/ui/select";
 import { volunteerApi } from "@/lib/api/volunteer";
-import { resolveImageUrl, statsApi } from "@/lib/api/endpoints";
+import { statsApi } from "@/lib/api/endpoints";
+import { AuthedImage } from "@/components/ui/authed-image";
 import { normalizeError } from "@/lib/api/client";
 import type { VolunteerAssignmentMode, VolunteerProfileUpdate } from "@/lib/api/types";
 
@@ -110,8 +111,8 @@ export default function VolunteerProfilePage() {
         <Card className="flex flex-col items-center gap-4 p-stack-lg text-center">
           <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-surface-container-high">
             {profile.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={resolveImageUrl(profile.avatar_url)} alt="Avatar" className="h-full w-full object-cover" />
+               
+              <AuthedImage src={profile.avatar_url} alt="Profile photo" className="h-full w-full object-cover" />
             ) : (
               <Icon name="person" className="text-[40px] text-on-surface-variant" />
             )}

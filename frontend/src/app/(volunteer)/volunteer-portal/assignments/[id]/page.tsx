@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DynamicStaticMap } from "@/components/maps/dynamic-static-map";
+import { EmergencyBanner } from "@/components/safety/emergency-banner";
 import { useToast } from "@/components/notifications/toast";
 import { volunteerApi } from "@/lib/api/volunteer";
 import { normalizeError } from "@/lib/api/client";
@@ -130,6 +131,9 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
 
       <div className="grid gap-gutter p-margin-mobile md:p-margin-desktop lg:grid-cols-3">
         <div className="space-y-gutter lg:col-span-2">
+          {/* A responder who arrives and finds a situation beyond their remit
+              needs the number in one tap, not a memory test. */}
+          <EmergencyBanner />
           <Card className="p-stack-md">
             <div className="mb-2 flex items-center gap-2">
               <PriorityBadge priority={r.priority} />

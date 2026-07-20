@@ -1,6 +1,7 @@
 "use client";
 
 import { apiClient } from "./client";
+import { API_ORIGIN } from "./config";
 import type {
   AuthResponse,
   GeocodeResult,
@@ -59,11 +60,26 @@ export const reportsApi = {
     const { data } = await apiClient.post<ReportCreateResponse>("/reports", input);
     return data;
   },
-  async uploadImages(reportId: string, files: File[]): Promise<void> {
+  /**
+   * Attach photos to a freshly-created report.
+   *
+   * `uploadToken` is the short-lived capability returned by `create` — it is
+   * what authorises an anonymous reporter to add images to their own report,
+   * and it expires in minutes. Hold it in memory; never persist it.
+   *
+   * The timeout override matters: uploads are multi-megabyte phone photos,
+   * often on a slow mobile connection, and the client-wide 20s default aborts
+   * them mid-flight.
+   */
+  async uploadImages(reportId: string, files: File[], uploadToken: string): Promise<void> {
     const form = new FormData();
     files.forEach((f) => form.append("files", f));
     await apiClient.post(`/reports/${reportId}/images`, form, {
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: {
+        "Content-Type": "multipart/form-data",
+        "X-Upload-Token": uploadToken,
+      },
+      timeout: 120_000,
     });
   },
   async track(trackingId: string): Promise<ReportTracking> {
@@ -104,9 +120,42 @@ export const mapsApi = {
   },
 };
 
-/** Resolve a relative upload URL (e.g. /uploads/..) to an absolute origin. */
+/**
+ * Resolve a relative file URL (e.g. `/api/v1/files/..`) against the API origin.
+ *
+ * The backend no longer serves stored files from an unauthenticated static
+ * mount; every object is delivered by `GET /api/v1/files/{key}`, which requires
+ * a bearer token and re-checks case ownership. This helper only builds the
+ * absolute URL — it cannot attach the token, so the result is NOT usable as a
+ * bare `<img src>` / `<a href>`. Fetch it with the authenticated client and
+ * render the response as an object URL.
+ */
 export function resolveImageUrl(url: string): string {
   if (url.startsWith("http")) return url;
-  const origin = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000";
-  return `${origin}${url}`;
+  return `${API_ORIGIN}${url}`;
+}
+
+/**
+ * Download a stored file that sits behind authorization.
+ *
+ * `GET /api/v1/files/{key}` requires a bearer token, so a plain `<a href>`
+ * would 401. Fetch the bytes through the authenticated client and hand the
+ * browser a temporary object URL instead.
+ */
+export async function downloadAuthedFile(url: string, filename?: string): Promise<void> {
+  const path = url.replace(/^.*\/api\/v1/, "");
+  const { data } = await apiClient.get(path, { responseType: "blob" });
+  const objectUrl = URL.createObjectURL(data as Blob);
+  try {
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    if (filename) a.download = filename;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

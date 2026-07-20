@@ -24,7 +24,10 @@ services:
         condition: service_healthy
     environment:
       AASRAH_DATABASE_URL: postgresql+psycopg://aasrah:aasrah@db:5432/aasrah
-      SECRET_KEY: ${SECRET_KEY:-dev-insecure-change-me}
+      # No fallback: a known default here is a forgeable JWT signing key for the
+      # whole platform, and this file is documented as an option for a real VPS.
+      # Fail loudly instead.
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set (python -c "import secrets;print(secrets.token_urlsafe(48))")}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DEBUG: ${DEBUG:-false}
       CORS_ORIGINS: http://localhost:3000

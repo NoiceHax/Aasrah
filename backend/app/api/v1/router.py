@@ -6,8 +6,10 @@ from app.api.v1 import (
     admin,
     admin_ops,
     auth,
+    files,
     health,
     maps,
+    me,
     push,
     reports,
     search,
@@ -27,12 +29,14 @@ from app.api.v1.ngo import volunteers as ngo_volunteers
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+api_router.include_router(me.router)
 api_router.include_router(reports.router)
 api_router.include_router(stats.router)
 api_router.include_router(maps.router)
 api_router.include_router(search.router)
 api_router.include_router(push.router)
 api_router.include_router(ws.router)
+api_router.include_router(files.router)
 api_router.include_router(ngo_profile.router)
 api_router.include_router(ngo_reports.router)
 api_router.include_router(ngo_case_extras.router)

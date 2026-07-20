@@ -7,9 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { StatusBadge } from "@/components/portal/status-badge";
-import { DynamicStaticMap } from "@/components/maps/dynamic-static-map";
 import { cn } from "@/lib/utils";
-import { reportsApi, resolveImageUrl } from "@/lib/api/endpoints";
+import { reportsApi } from "@/lib/api/endpoints";
 import { normalizeError } from "@/lib/api/client";
 import type { ReportTracking, TimelineState } from "@/lib/api/types";
 
@@ -118,51 +117,19 @@ export function TrackLookup({ initialId }: { initialId?: string }) {
               </p>
               <p className="text-body-md text-primary">{formatTimestamp(report.created_at)}</p>
             </div>
-            {report.address && (
+            {report.locality && (
               <div>
                 <p className="text-label-sm uppercase tracking-wider text-on-surface-variant">
-                  Location
+                  Area
                 </p>
-                <p className="text-body-md text-primary">{report.address}</p>
+                <p className="text-body-md text-primary">{report.locality}</p>
               </div>
             )}
           </div>
 
-          {report.description && (
-            <p className="mb-6 rounded-lg bg-surface-container-low p-4 text-body-sm text-on-surface-variant">
-              {report.description}
-            </p>
-          )}
-
-          {/* Images */}
-          {report.images.length > 0 && (
-            <div className="mb-6">
-              <p className="mb-2 text-label-sm uppercase tracking-wider text-on-surface-variant">
-                Photos
-              </p>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {report.images.map((img) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={img.id}
-                    src={resolveImageUrl(img.url)}
-                    alt="Report attachment"
-                    className="aspect-square w-full rounded-md border border-outline-variant object-cover"
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Map */}
-          {report.latitude != null && report.longitude != null && (
-            <div className="mb-6">
-              <p className="mb-2 text-label-sm uppercase tracking-wider text-on-surface-variant">
-                Map
-              </p>
-              <DynamicStaticMap lat={report.latitude} lng={report.longitude} />
-            </div>
-          )}
+          {/* Case content — description, photos and the exact location — is
+              deliberately not shown here. This page needs no login, so anyone
+              holding the ID can see it; progress is all it should reveal. */}
 
           {/* Timeline */}
           <p className="mb-4 text-label-sm uppercase tracking-wider text-on-surface-variant">

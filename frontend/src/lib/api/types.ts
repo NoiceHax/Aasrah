@@ -53,7 +53,8 @@ export type NotificationType = "success" | "error" | "warning" | "info";
 
 export type ReportPriority = "critical" | "high" | "medium" | "stable";
 
-export type SituationType = "medical" | "shelter" | "food" | "safety" | "other";
+export type SituationType = "medical"
+  | "child_protection" | "shelter" | "food" | "safety" | "other";
 
 export type TimelineState = "complete" | "active" | "upcoming";
 
@@ -115,25 +116,30 @@ export interface ReportCreateResponse {
   status: ReportStatus;
   created_at: string;
   report_id: string;
+  /** Short-lived capability authorising the follow-up image upload. In-memory only. */
+  upload_token: string;
 }
 
+/**
+ * Public tracking view. Served unauthenticated, so it carries progress only —
+ * no description, no precise coordinates, no photos. `locality` is a coarsened
+ * area, not an address. Mirrors ReportTrackingOut in the backend.
+ */
 export interface ReportTracking {
   tracking_id: string;
   situation: SituationType;
   priority: ReportPriority;
   status: ReportStatus;
-  description: string;
-  address: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  locality: string | null;
   created_at: string;
   updated_at: string;
-  images: ReportImage[];
   timeline: TimelineEvent[];
 }
 
 export interface ReportCreateInput {
   situation: SituationType;
+  /** Reporter-declared; null = not answered. Forces CRITICAL priority server-side. */
+  subject_is_minor?: boolean | null;
   priority?: ReportPriority;
   description: string;
   address?: string | null;

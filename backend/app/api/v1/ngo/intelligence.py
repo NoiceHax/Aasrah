@@ -90,9 +90,7 @@ def ngo_match_candidates(
     db: Session = Depends(get_db),
 ) -> dict:
     """Ranked NGO candidates for a report (used to see where else it could route)."""
-    report = db.get(Report, report_id)
-    if not report:
-        raise NotFoundError("Report not found")
+    report = _owned(db, ngo, report_id)
     return {"candidates": rank_ngos_for_report(db, report)}
 
 

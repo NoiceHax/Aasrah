@@ -87,16 +87,23 @@ export function Hero() {
           className="relative"
         >
           <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-glass shadow-raised-lg">
+            {/*
+              Illustrative, not live. The rows below are hand-written examples
+              of what a coordinator's queue looks like — labelled as such,
+              because presenting invented case IDs and NGO names as real
+              activity is not something an NGO partner should have to discover
+              by clicking. Wire this to /stats when there is live data worth
+              showing.
+            */}
             <div className="flex items-center justify-between">
-              <span className="text-label-md font-semibold">Live Response Feed</span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/20 px-2.5 py-0.5 text-label-sm text-tertiary-fixed">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
-                Active
+              <span className="text-label-md font-semibold">Example response feed</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-label-sm text-on-primary-container">
+                Illustrative
               </span>
             </div>
             <div className="mt-4 space-y-3">
               {[
-                { id: "#AR-9402", label: "Claimed · Hope Foundation", state: "info", km: "1.2 km" },
+                { id: "#AR-9402", label: "Claimed by a partner NGO", state: "info", km: "1.2 km" },
                 { id: "#AR-9398", label: "Responder en route", state: "success", km: "3.4 km" },
                 { id: "#AR-9391", label: "Pending verification", state: "warning", km: "0.8 km" },
               ].map((row) => (
@@ -128,9 +135,10 @@ export function Hero() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex items-center justify-between rounded-lg bg-secondary/30 px-3.5 py-3">
-              <span className="text-label-sm">Avg. response time today</span>
-              <span className="text-headline-sm font-bold">18.5m</span>
+            <div className="mt-4 rounded-lg bg-secondary/30 px-3.5 py-3">
+              <span className="text-label-sm">
+                Sample cases shown for illustration. Live platform figures are below.
+              </span>
             </div>
           </div>
         </motion.div>

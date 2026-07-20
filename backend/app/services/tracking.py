@@ -22,3 +22,20 @@ def generate_tracking_id(repo: ReportRepository, *, max_attempts: int = 10) -> s
         if not repo.tracking_id_exists(candidate):
             return candidate
     raise RuntimeError("Could not generate a unique tracking ID")
+
+
+def coarse_locality(address: str | None) -> str | None:
+    """Reduce a full address to a recognisable but non-locating area.
+
+    Used by the unauthenticated tracking view: enough for a reporter to
+    recognise their own report ("Koramangala, Bengaluru"), not enough for a
+    stranger to find the person it describes. Keeps the last two
+    comma-separated components, which for a typical geocoded address is
+    locality + city.
+    """
+    if not address:
+        return None
+    parts = [p.strip() for p in address.split(",") if p.strip()]
+    if not parts:
+        return None
+    return ", ".join(parts[-2:])

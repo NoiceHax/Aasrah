@@ -12,7 +12,7 @@ import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/notifications/toast";
 import { ngoApi } from "@/lib/api/ngo";
-import { resolveImageUrl } from "@/lib/api/endpoints";
+import { AuthedImage } from "@/components/ui/authed-image";
 import { normalizeError } from "@/lib/api/client";
 import type { NgoUpdateInput } from "@/lib/api/types";
 
@@ -101,8 +101,8 @@ export default function ProfilePage() {
         <Card className="flex flex-col items-center gap-4 p-stack-lg text-center">
           <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl bg-surface-container-high">
             {ngo.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={resolveImageUrl(ngo.logo_url)} alt="Logo" className="h-full w-full object-cover" />
+               
+              <AuthedImage src={ngo.logo_url} alt="Organisation logo" className="h-full w-full object-cover" />
             ) : (
               <Icon name="corporate_fare" className="text-[40px] text-on-surface-variant" />
             )}

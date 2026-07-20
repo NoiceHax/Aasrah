@@ -25,7 +25,7 @@ export function NgoShowcase() {
           align="left"
           eyebrow="Our network"
           title="Verified NGOs, ready to respond"
-          description="Every partner is vetted before they can claim a case, so help is always credentialed."
+          description="Every partner is vetted before they can claim a case, so responders are credentialed."
           className="max-w-2xl"
         />
         <Button href={routes.about} variant="outline" trailingIcon="arrow_forward">

@@ -40,6 +40,9 @@ class SituationType(str, enum.Enum):
     SHELTER = "shelter"
     FOOD = "food"
     SAFETY = "safety"
+    # A child at risk (JJ Act / POCSO mandatory-reporting territory in India).
+    # Always routed at CRITICAL priority; see ReportService.create.
+    CHILD_PROTECTION = "child_protection"
     OTHER = "other"
 
 
